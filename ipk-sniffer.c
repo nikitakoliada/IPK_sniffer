@@ -140,6 +140,11 @@ Config parse_args(int argc, char *argv[])
     Config config;
     init_config(&config);
 
+    if(argc == 2 && strcmp(argv[1], "-i") == 0){
+        print_network_interfaces();
+        exit(EXIT_SUCCESS);
+    }
+
     const struct option long_options[] = {
         {"interface", required_argument, 0, 'i'},
         {"tcp", no_argument, 0, 't'},
@@ -205,8 +210,9 @@ Config parse_args(int argc, char *argv[])
             exit(EXIT_SUCCESS);
             break;
         case '?':
-             //TODO check if it's the only arg
-            if (optopt == 'i') {
+            // TODO check if it's the only arg
+            if (optopt == 'i')
+            {
                 print_network_interfaces();
             }
             if (optopt)
@@ -223,90 +229,107 @@ Config parse_args(int argc, char *argv[])
             break;
         }
     }
+
+    // if no filters were set, set all of them
+    if(!(config.tcp || config.udp || config.arp || config.icmp4 || config.icmp6 || config.igmp || config.mld || config.ndp)){
+        config.tcp = 1;
+        config.udp = 1;
+        config.arp = 1;
+        config.icmp4 = 1;
+        config.icmp6 = 1;
+        config.igmp = 1;
+        config.mld = 1;
+        config.ndp = 1;
+    }
+
     return config;
 }
 
 void write_filter_exp(char *filter_exp, Config config)
 {
     char *ptr = filter_exp;
-    ptr += sprintf(ptr, "ip");
+    int written = 0;
 
     if (config.tcp)
     {
-        ptr += sprintf(ptr, " or tcp");
+        ptr += sprintf(ptr, (written++ == 0) ? "tcp" : " or tcp");
     }
 
     if (config.udp)
     {
-        ptr += sprintf(ptr, " or udp");
+        ptr += sprintf(ptr, (written++ == 0) ? "udp" : " or udp");
     }
 
     if (config.port != -1)
     {
-        ptr += sprintf(ptr, " or port %d", config.port);
+        ptr += sprintf(ptr, (written++ == 0) ? "port %d" : " or port %d", config.port);
     }
 
     if (config.port_source != -1)
     {
-        ptr += sprintf(ptr, " or src port %d", config.port_source);
+        ptr += sprintf(ptr, (written++ == 0) ? "src port %d" : " or src port %d", config.port_source);
     }
 
     if (config.port_destination != -1)
     {
-        ptr += sprintf(ptr, " or dst port %d", config.port_destination);
+        ptr += sprintf(ptr, (written++ == 0) ? "dst port %d" : " or dst port %d", config.port_destination);
     }
 
     if (config.arp)
     {
-        ptr += sprintf(ptr, " or arp");
+        ptr += sprintf(ptr, (written++ == 0) ? "arp" : " or arp");
     }
 
     if (config.icmp4)
     {
-        ptr += sprintf(ptr, " or icmp");
+        ptr += sprintf(ptr, (written++ == 0) ? "icmp" : " or icmp");
     }
 
     if (config.icmp6)
     {
-        ptr += sprintf(ptr, " or icmp6");
+        ptr += sprintf(ptr, (written++ == 0) ? "icmp6" : " or icmp6");
     }
 
     if (config.igmp)
     {
-        ptr += sprintf(ptr, " or igmp");
+        ptr += sprintf(ptr, (written++ == 0) ? "igmp" : " or igmp");
     }
 
     if (config.mld)
     {
-        ptr += sprintf(ptr, " or mld");
+        ptr += sprintf(ptr, (written++ == 0) ? "(icmp6 and icmp6[0] >= 130 and icmp6[0] <= 132)" : " or (icmp6 and icmp6[0] >= 130 and icmp6[0] <= 132)");
     }
 
     if (config.ndp)
     {
-        ptr += sprintf(ptr, " or ndp");
+        ptr += sprintf(ptr, (written++ == 0) ? "(icmp6 and icmp6[0] >= 133 and icmp6 and icmp6[0] <= 136)" : " or (icmp6 and icmp6[0] >= 133 and icmp6 and icmp6[0] <= 136)");
     }
 }
 
 char *timespamp(const struct pcap_pkthdr *header)
 {
-    // Ensure buffer is valid
+    if (header == NULL) {
+        return NULL;
+    }
+
+    // Allocate buffer for the formatted timestamp
     char *buffer = (char *)malloc(TIME_LENGTH);
     if (buffer == NULL)
         return NULL;
 
-    // Extract the timestamp from the header
-    time_t seconds = header->ts.tv_sec;
-    struct tm utc_time;
+    // Convert timestamp to broken-down time
+    time_t seconds = (time_t)header->ts.tv_sec;
+    struct tm *timeinfo = localtime(&seconds);
 
-    // Convert seconds to UTC time structure
-    gmtime_r(&seconds, &utc_time);
+    if (timeinfo == NULL) {
+        free(buffer);
+        return NULL;
+    }
 
     // Format the time into the buffer using RFC 3339 format
-    // Assumes UTC ('Z' suffix)
-
-    sprintf(buffer, "%04d-%02d-%02dT%02d:%02d:%02d.%06ldZ",
-            utc_time.tm_year + 1900, utc_time.tm_mon + 1, utc_time.tm_mday,
-            utc_time.tm_hour, utc_time.tm_min, utc_time.tm_sec, (long)header->ts.tv_usec);
+    snprintf(buffer, TIME_LENGTH, "%04d-%02d-%02dT%02d:%02d:%02d.%06ld",
+            timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
+            timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, (long)header->ts.tv_usec);
 
     return buffer;
 }
@@ -336,6 +359,29 @@ char *bytes_to_hex(const uint8_t *bytes, size_t length)
     hex_string[2 * length] = '\0';
 
     return hex_string;
+}
+
+void display_packet_contents(const unsigned char *data, int len) {
+    for (int line = 0; line < len; line += 16) {
+        printf("\n0x%04x: ", line);
+
+        // Print hex values
+        int line_end = line + 16;
+        for (int pos = line; pos < line_end; pos++) {
+            if (pos < len)
+                printf("%02x ", data[pos]);
+            else
+                printf("   ");
+        }
+
+        // Print ASCII representation
+        printf(" ");
+        for (int pos = line; pos < line_end && pos < len; pos++) {
+            unsigned char char_val = data[pos];
+            printf("%c", isprint(char_val) ? char_val : '.');
+        }
+    }
+    printf("\n");
 }
 
 void procces_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
@@ -389,9 +435,9 @@ void procces_packet(u_char *args, const struct pcap_pkthdr *header, const u_char
     }
     else
     {
-        // in other cases, no other type is supproted 
+        // in other cases, no other type is supproted
     }
-    write_packets(packet, header->caplen);
+    display_packet_contents(packet, header->caplen);
 }
 
 int main(int argc, char *argv[])
@@ -405,9 +451,7 @@ int main(int argc, char *argv[])
     {
         print_network_interfaces();
     }
-    else{
-        printf("interface: %s\n", config.interface);
-    }
+
     char errbuf[PCAP_ERRBUF_SIZE];
 
     pcap_if_t *alldevs;
