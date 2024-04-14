@@ -21,17 +21,12 @@
 
 #define BUFFER_INTERACE_LENGTH 1024
 #define BUFFER_FILTER_LENGTH 4096
-#define MAC_LENGTH 18
+#define BUFFER_MAC_LENGTH 18
 #define TIME_LENGTH 1024
 #define ETHER_SIZE 14
 #define ETH_ALEN 6
 
-/**
- * Properly exits program with given message and errcode
- *
- * @param message Error message
- * @param ...
- */
+// Function to print an error message and exit the program
 void error(const char *message, ...)
 {
     va_list args;
@@ -101,6 +96,7 @@ pcap_if_t *get_network_interfaces()
     pcap_if_t *alldevs;
     char errbuf[PCAP_ERRBUF_SIZE];
 
+    // Get the list of network interfaces
     if (pcap_findalldevs(&alldevs, errbuf) == -1)
     {
         error("pcap_findalldevs() failed: %s\n", errbuf);
@@ -111,14 +107,17 @@ pcap_if_t *get_network_interfaces()
 
 void print_network_interfaces()
 {
+    // Get the list of network interfaces
     pcap_if_t *item = get_network_interfaces();
 
+    // Print the list of network interfaces
     while (item)
     {
         printf("%s\n", item->name);
         item = item->next;
     }
 
+    // Free the allocated memory
     pcap_freealldevs(item);
     exit(EXIT_SUCCESS);
 }
@@ -140,7 +139,8 @@ Config parse_args(int argc, char *argv[])
     Config config;
     init_config(&config);
 
-    if(argc == 2 && strcmp(argv[1], "-i") == 0){
+    if (argc == 2 && strcmp(argv[1], "-i") == 0)
+    {
         print_network_interfaces();
         exit(EXIT_SUCCESS);
     }
@@ -162,6 +162,7 @@ Config parse_args(int argc, char *argv[])
         {"n", required_argument, 0, 'n'},
         {0, 0, 0, 0}};
 
+    // Parse the command-line options
     while ((opt = getopt_long(argc, argv, "i:p:n:tuh", long_options, NULL)) != -1)
     {
         switch (opt)
@@ -231,7 +232,8 @@ Config parse_args(int argc, char *argv[])
     }
 
     // if no filters were set, set all of them
-    if(!(config.tcp || config.udp || config.arp || config.icmp4 || config.icmp6 || config.igmp || config.mld || config.ndp)){
+    if (!(config.tcp || config.udp || config.arp || config.icmp4 || config.icmp6 || config.igmp || config.mld || config.ndp))
+    {
         config.tcp = 1;
         config.udp = 1;
         config.arp = 1;
@@ -250,6 +252,8 @@ void write_filter_exp(char *filter_exp, Config config)
     char *ptr = filter_exp;
     int written = 0;
 
+    // Write the filter expression based on the configuration
+    // The filter expression is a combination of the selected protocols and ports
     if (config.tcp)
     {
         ptr += sprintf(ptr, (written++ == 0) ? "tcp" : " or tcp");
@@ -308,7 +312,8 @@ void write_filter_exp(char *filter_exp, Config config)
 
 char *timespamp(const struct pcap_pkthdr *header)
 {
-    if (header == NULL) {
+    if (header == NULL)
+    {
         return NULL;
     }
 
@@ -317,57 +322,53 @@ char *timespamp(const struct pcap_pkthdr *header)
     if (buffer == NULL)
         return NULL;
 
-    // Convert timestamp to broken-down time
+    // Convert timestamp to local time
     time_t seconds = (time_t)header->ts.tv_sec;
     struct tm *timeinfo = localtime(&seconds);
 
-    if (timeinfo == NULL) {
+    if (timeinfo == NULL)
+    {
         free(buffer);
         return NULL;
     }
 
     // Format the time into the buffer using RFC 3339 format
     snprintf(buffer, TIME_LENGTH, "%04d-%02d-%02dT%02d:%02d:%02d.%06ld",
-            timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
-            timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, (long)header->ts.tv_usec);
+             timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
+             timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, (long)header->ts.tv_usec);
 
     return buffer;
 }
-
-char *bytes_to_hex(const uint8_t *bytes, size_t length)
+char *bytes_to_hex(uint8_t *bytes)
 {
-    if (bytes == NULL || length == 0)
+    // Dynamically allocating memory to hold the MAC address string.
+    char *hex = malloc(BUFFER_MAC_LENGTH);
+    if (hex == NULL)
     {
-        return NULL; // Validate input to ensure it's usable
+        return NULL; 
     }
+    hex[0] = '\0'; //  start with an empty string.
 
-    // Each byte will be represented by two hexadecimal characters
-    // Allocate memory for the hex string: 2 characters per byte plus 1 for the null terminator
-    char *hex_string = malloc(2 * length + 1);
-    if (hex_string == NULL)
+    int pos = 0; // keep track of the current position in the hex string.
+
+    for (int i = 0; i < ETH_ALEN; i++)
     {
-        return NULL; // Check if memory allocation failed
+        // sprintf returns the number of characters written excluding the null terminator.
+        pos += sprintf(&hex[pos], (i < ETH_ALEN - 1 ? "%02x:" : "%02x"), bytes[i]);
     }
-
-    // Convert each byte into a two-character hex value
-    for (size_t i = 0; i < length; i++)
-    {
-        sprintf(&hex_string[i * 2], "%02X", bytes[i]);
-    }
-
-    // Null-terminate the string
-    hex_string[2 * length] = '\0';
-
-    return hex_string;
+    return hex;
 }
 
-void display_packet_contents(const unsigned char *data, int len) {
-    for (int line = 0; line < len; line += 16) {
+void display_packet_contents(const unsigned char *data, int len)
+{
+    for (int line = 0; line < len; line += 16)
+    {
         printf("\n0x%04x: ", line);
 
         // Print hex values
         int line_end = line + 16;
-        for (int pos = line; pos < line_end; pos++) {
+        for (int pos = line; pos < line_end; pos++)
+        {
             if (pos < len)
                 printf("%02x ", data[pos]);
             else
@@ -376,7 +377,8 @@ void display_packet_contents(const unsigned char *data, int len) {
 
         // Print ASCII representation
         printf(" ");
-        for (int pos = line; pos < line_end && pos < len; pos++) {
+        for (int pos = line; pos < line_end && pos < len; pos++)
+        {
             unsigned char char_val = data[pos];
             printf("%c", isprint(char_val) ? char_val : '.');
         }
@@ -388,9 +390,12 @@ void procces_packet(u_char *args, const struct pcap_pkthdr *header, const u_char
 {
     struct ether_header *eth_header = (struct ether_header *)packet; // packet header
 
+    // Print the packet information
+    printf("\n\n");
+
     printf("timestamp: %s\n", timespamp(header));
-    printf("src MAC: %s\n", bytes_to_hex(eth_header->ether_shost, sizeof(eth_header->ether_shost) / sizeof(eth_header->ether_shost))); // TODO check this
-    printf("dst MAC: %s\n", bytes_to_hex(eth_header->ether_dhost, sizeof(eth_header->ether_dhost) / sizeof(eth_header->ether_dhost))); // TODO check this
+    printf("src MAC: %s\n", bytes_to_hex(eth_header->ether_shost)); // TODO check this
+    printf("dst MAC: %s\n", bytes_to_hex(eth_header->ether_dhost)); // TODO check this
     printf("frame length: %d bytes\n", header->caplen);
 
     // Check if the packet is an IP packet
@@ -425,7 +430,6 @@ void procces_packet(u_char *args, const struct pcap_pkthdr *header, const u_char
     else if (ntohs(eth_header->ether_type) == ETHERTYPE_IPV6)
     {
         struct ip6_hdr *ip6_header = (struct ip6_hdr *)(packet + ETHER_SIZE); // ipv6 header
-        printf("IPv6 packet\n");
         char src_ip6[INET6_ADDRSTRLEN];
         char dst_ip6[INET6_ADDRSTRLEN];
         inet_ntop(AF_INET6, &ip6_header->ip6_src, src_ip6, INET6_ADDRSTRLEN);
