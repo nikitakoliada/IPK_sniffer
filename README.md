@@ -64,48 +64,42 @@ dst port: 443
 0x0050: a0 c1 7b 99 f1 78 6c 14 0b 13 6d 7c 42 8f 9f ee  ..{..xl...m|B...
 0x0060: 0b 7f 51 23 d7 ea a9 d6 26 47 ec 5a 69           ..Q#....&G.Zi
 ```
-Header data of the packet will display timestamp, source and destination info in various forms (for IPv4 protocol it is ip address, for IPv6 protocol it is IPv6 address) with MAC addresses.
+Packet headers include timestamp details as well as source and destination information, which are formatted as IP addresses for both IPv4 and IPv6 protocols, along with the MAC addresses.
 
-Below will be displayed packet itself in form where:
-- First part represents content of the packet in hexadecimal form.
-- Second - ASCII form of each hexadecimal value in the first part.
+The packet content itself is presented in two formats:
+- The first section displays the packet's content in hexadecimal form.
+- The second section shows the ASCII representation of each hexadecimal value.
 
-### Protocols
-Sniffer works with limitted amount of protocols. Such as:
+### Supported Protocols
+The sniffer supports a limited range of protocols:
 
 #### IPv4
 ##### TCP
-TCP packets are used for reliable, ordered, and error-checked
-delivery of data between applications over an IP network. TCP packets operate
-at the Transport layer (Layer 4) of the OSI model.
+TCP (Transmission Control Protocol) is designed for reliable, ordered, and error-checked data delivery between applications on an IP network. It functions at the Transport layer (Layer 4) of the OSI model.
 
 ##### UDP
-UDP is a transport protocol used for sending data over IP networks. It is a connectionless protocol that does not guarantee reliable delivery of data or error checking. Mostly it is used in cases when amount of data is more required than its quality (such as streaming)
+UDP (User Datagram Protocol) is used for transmitting data over IP networks without establishing a connection, prioritizing speed over reliability. It is often used for applications where speed is critical, such as video streaming.
 
 ##### ICMPv4
-ICMPv4 is used for diagnostics and error checking only.
-There is no such concept as 'port' for this type of protocol, additionaly
-it operates within layer 3, while the ports are at layer 4 of OSI. For generating such traffic people usually use `ping <ip>`.
+ICMPv4 (Internet Control Message Protocol version 4) is utilized primarily for network diagnostics and error reporting. It operates at the Network layer (Layer 3) of the OSI model, and does not utilize ports.
 
 ##### IGMP
-IGMP protocol operates at network layer 3 of the OSI model, while ports are associated with layer 4 (transport level). IGMP is a network layer protocol used to set up multicasting on networks that use the Internet Protocol version 4 (IPv4)
+IGMP (Internet Group Management Protocol) is used for organizing multicast groups in IPv4 networks. It operates at the Network layer (Layer 3).
 
 #### ARP
-ARP is a protocol used to map a network address
-to a physical address. It has its limitations - it works only in local enviroment
+ARP (Address Resolution Protocol) maps network addresses to physical addresses but is limited to local networks only.
 
 #### IPv6
-IPv6 is the most recent version of the Internet Protocol, designed to eventually replace IPv4.
+IPv6 is the latest version of the Internet Protocol, set to eventually supersede IPv4.
 
 ##### NDP
-NDP is a protocol in IPv6 that is used to
-discover and maintain information about other nodes on the same link.NDP does not use ports, instead they use message type just like ICMPv6
+NDP (Neighbor Discovery Protocol) is analogous to ARP but for IPv6. It helps in discovering and maintaining information about other network nodes without using ports, using message types instead.
 
 ##### MLD
-MLD operates at the network layer (Layer 3) of the OSI model, and does not use any ports like transport layer protocols such as TCP or UDP.
+MLD (Multicast Listener Discovery) is used for managing multicast group memberships in IPv6 networks, functioning at the Network layer (Layer 3).
 
 ##### ICMPv6
-ICMPv6 is a protocol that operates at the network layer (Layer 3) of the OSI model, just like MLD. ICMPv6 messages are sent and received using IPv6 protocol, and do not use ports. ICMPv6 messages are identified by their message type field, which is part of the ICMPv6 header in the IPv6 packet.
+Like its IPv4 counterpart, ICMPv6 (Internet Control Message Protocol version 6) is used for network diagnostics and error reporting in IPv6 networks. It also operates at the Network layer and identifies messages by type rather than ports.
 
 ## Testing
 For testing I have used [wireshark](https://www.wireshark.org/) in order to compare incoming packets and its content with IPK sniffer.
