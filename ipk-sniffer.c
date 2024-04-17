@@ -254,31 +254,69 @@ void write_filter_exp(char *filter_exp, Config config)
 
     // Write the filter expression based on the configuration
     // The filter expression is a combination of the selected protocols and ports
-    if (config.tcp)
+    if (config.tcp || config.udp)
     {
-        ptr += sprintf(ptr, (written++ == 0) ? "tcp" : " or tcp");
+        if (config.tcp)
+        {
+            char *filter = "tcp";
+            if (config.port != -1)
+            {
+                ptr += sprintf(ptr, (written++ == 0) ? "(%s port %d)" : " or (%s port %d)", filter, config.port);
+            }
+            else if (config.port_source != -1 || config.port_destination != -1)
+            {
+                if (config.port_source != -1 && config.port_destination != -1)
+                {
+                    ptr += sprintf(ptr, (written++ == 0) ? "(%s src port %d and %s dst port %d)" : " or (%s src port %d and %s dst port %d)", filter, config.port_source, filter, config.port_destination);
+                }
+                else
+                {
+                    if (config.port_source != -1)
+                    {
+                        ptr += sprintf(ptr, (written++ == 0) ? "(%s src port %d)" : " or (%s src port %d)", filter, config.port_source);
+                    }
+                    if (config.port_destination != -1)
+                    {
+                        ptr += sprintf(ptr, (written++ == 0) ? "(%s dst port %d)" : " or (%s dst port %d)", filter, config.port_destination);
+                    }
+                }
+            }
+            else
+            {
+                ptr += sprintf(ptr, (written++ == 0) ? "%s" : " or %s", filter);
+            }
+        }
+        if (config.udp)
+        {
+            char *filter = "udp";
+            if (config.port != -1)
+            {
+                ptr += sprintf(ptr, (written++ == 0) ? "(%s port %d)" : " or (%s port %d)", filter, config.port);
+            }
+            else if (config.port_source != -1 || config.port_destination != -1)
+            {
+                if (config.port_source != -1 && config.port_destination != -1)
+                {
+                    ptr += sprintf(ptr, (written++ == 0) ? "(%s src port %d and %s dst port %d)" : " or (%s src port %d and %s dst port %d)", filter, config.port_source, filter, config.port_destination);
+                }
+                else
+                {
+                    if (config.port_source != -1)
+                    {
+                        ptr += sprintf(ptr, (written++ == 0) ? "(%s src port %d)" : " or (%s src port %d)", filter, config.port_source);
+                    }
+                    if (config.port_destination != -1)
+                    {
+                        ptr += sprintf(ptr, (written++ == 0) ? "(%s dst port %d)" : " or (%s dst port %d)", filter, config.port_destination);
+                    }
+                }
+            }
+            else
+            {
+                ptr += sprintf(ptr, (written++ == 0) ? "%s" : " or %s", filter);
+            }
+        }
     }
-
-    if (config.udp)
-    {
-        ptr += sprintf(ptr, (written++ == 0) ? "udp" : " or udp");
-    }
-
-    if (config.port != -1)
-    {
-        ptr += sprintf(ptr, (written++ == 0) ? "port %d" : " or port %d", config.port);
-    }
-
-    if (config.port_source != -1)
-    {
-        ptr += sprintf(ptr, (written++ == 0) ? "src port %d" : " or src port %d", config.port_source);
-    }
-
-    if (config.port_destination != -1)
-    {
-        ptr += sprintf(ptr, (written++ == 0) ? "dst port %d" : " or dst port %d", config.port_destination);
-    }
-
     if (config.arp)
     {
         ptr += sprintf(ptr, (written++ == 0) ? "arp" : " or arp");
@@ -308,36 +346,33 @@ void write_filter_exp(char *filter_exp, Config config)
     {
         ptr += sprintf(ptr, (written++ == 0) ? "(icmp6 and icmp6[0] >= 133 and icmp6 and icmp6[0] <= 136)" : " or (icmp6 and icmp6[0] >= 133 and icmp6 and icmp6[0] <= 136)");
     }
+    printf("Filter expression: %s\n", filter_exp);
 }
 
-char *timespamp(const struct pcap_pkthdr *header)
+char *convert_to_rfc3339(const struct pcap_pkthdr *packet_header)
 {
-    if (header == NULL)
-    {
-        return NULL;
-    }
-
-    // Allocate buffer for the formatted timestamp
-    char *buffer = (char *)malloc(TIME_LENGTH);
-    if (buffer == NULL)
+    if (!packet_header)
         return NULL;
 
-    // Convert timestamp to local time
-    time_t seconds = (time_t)header->ts.tv_sec;
-    struct tm *timeinfo = localtime(&seconds);
-
-    if (timeinfo == NULL)
-    {
-        free(buffer);
+    // Allocate memory for the output RFC 3339 formatted string
+    char *formatted_time = malloc(TIME_LENGTH);
+    if (!formatted_time)
         return NULL;
-    }
 
-    // Format the time into the buffer using RFC 3339 format
-    snprintf(buffer, TIME_LENGTH, "%04d-%02d-%02dT%02d:%02d:%02d.%06ld",
-             timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
-             timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, (long)header->ts.tv_usec);
+    // Extract and convert time
+    struct tm *local_time = localtime(&packet_header->ts.tv_sec);
+    char date_time[30];
+    strftime(date_time, sizeof(date_time), "%Y-%m-%dT%H:%M:%S", local_time);
 
-    return buffer;
+    // Format microseconds and timezone offset
+    int millisec = packet_header->ts.tv_usec / 1000;
+    long timezone_offset = local_time->tm_gmtoff;
+    int hours_offset = timezone_offset / 3600;
+    int minutes_offset = (timezone_offset % 3600) / 60;
+
+    snprintf(formatted_time, TIME_LENGTH, "%s.%03d%+03d:%02d", date_time, millisec, hours_offset, minutes_offset);
+
+    return formatted_time;
 }
 char *bytes_to_hex(uint8_t *bytes)
 {
@@ -345,7 +380,7 @@ char *bytes_to_hex(uint8_t *bytes)
     char *hex = malloc(BUFFER_MAC_LENGTH);
     if (hex == NULL)
     {
-        return NULL; 
+        return NULL;
     }
     hex[0] = '\0'; //  start with an empty string.
 
@@ -393,7 +428,7 @@ void procces_packet(u_char *args, const struct pcap_pkthdr *header, const u_char
     // Print the packet information
     printf("\n\n");
 
-    printf("timestamp: %s\n", timespamp(header));
+    printf("timestamp: %s\n", convert_to_rfc3339(header));
     printf("src MAC: %s\n", bytes_to_hex(eth_header->ether_shost)); // TODO check this
     printf("dst MAC: %s\n", bytes_to_hex(eth_header->ether_dhost)); // TODO check this
     printf("frame length: %d bytes\n", header->caplen);
