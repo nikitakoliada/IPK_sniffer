@@ -26,6 +26,12 @@
 #define ETHER_SIZE 14
 #define ETH_ALEN 6
 
+/* 
+    Author: Nikita Koliada
+    Date: 2024-04-17
+*/
+
+
 // Function to print an error message and exit the program
 void error(const char *message, ...)
 {
@@ -346,7 +352,6 @@ void write_filter_exp(char *filter_exp, Config config)
     {
         ptr += sprintf(ptr, (written++ == 0) ? "(icmp6 and icmp6[0] >= 133 and icmp6 and icmp6[0] <= 136)" : " or (icmp6 and icmp6[0] >= 133 and icmp6 and icmp6[0] <= 136)");
     }
-    printf("Filter expression: %s\n", filter_exp);
 }
 
 char *convert_to_rfc3339(const struct pcap_pkthdr *packet_header)
@@ -376,7 +381,7 @@ char *convert_to_rfc3339(const struct pcap_pkthdr *packet_header)
 }
 char *bytes_to_hex(uint8_t *bytes)
 {
-    // Dynamically allocating memory to hold the MAC address string.
+    // Dynamically allocating memory to hold address string.
     char *hex = malloc(BUFFER_MAC_LENGTH);
     if (hex == NULL)
     {
@@ -388,7 +393,7 @@ char *bytes_to_hex(uint8_t *bytes)
 
     for (int i = 0; i < ETH_ALEN; i++)
     {
-        // sprintf returns the number of characters written excluding the null terminator.
+        // sprintf returns the number of characters written
         pos += sprintf(&hex[pos], (i < ETH_ALEN - 1 ? "%02x:" : "%02x"), bytes[i]);
     }
     return hex;
@@ -429,8 +434,8 @@ void procces_packet(u_char *args, const struct pcap_pkthdr *header, const u_char
     printf("\n\n");
 
     printf("timestamp: %s\n", convert_to_rfc3339(header));
-    printf("src MAC: %s\n", bytes_to_hex(eth_header->ether_shost)); // TODO check this
-    printf("dst MAC: %s\n", bytes_to_hex(eth_header->ether_dhost)); // TODO check this
+    printf("src MAC: %s\n", bytes_to_hex(eth_header->ether_shost)); 
+    printf("dst MAC: %s\n", bytes_to_hex(eth_header->ether_dhost)); 
     printf("frame length: %d bytes\n", header->caplen);
 
     // Check if the packet is an IP packet
