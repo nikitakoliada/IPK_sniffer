@@ -1,3 +1,14 @@
+/**
+ * @file ipk-sniffer.c
+ * @brief A program to sniff network packets and filter them based on various criteria.
+ *
+ * This program uses the pcap library to capture network packets and applies filters based on the user's command-line options.
+ * It supports filtering by protocol (TCP, UDP, ARP, ICMPv4, ICMPv6, IGMP, MLD, NDP) and port numbers.
+ * The program can also display the list of available network interfaces.
+ *
+ * @author Nikita Koliada
+ * @date 2024-04-17
+ */
 #include <stdio.h>
 #include <stdbool.h>
 #include <getopt.h>
@@ -25,12 +36,6 @@
 #define TIME_LENGTH 1024
 #define ETHER_SIZE 14
 #define ETH_ALEN 6
-
-/* 
-    Author: Nikita Koliada
-    Date: 2024-04-17
-*/
-
 
 // Function to print an error message and exit the program
 void error(const char *message, ...)

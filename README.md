@@ -70,6 +70,34 @@ The packet content itself is presented in two formats:
 - The first section displays the packet's content in hexadecimal form.
 - The second section shows the ASCII representation of each hexadecimal value.
 
+## Implementation
+The main dependency that the project has is <pcap.h> lib which is used to capture packets.
+```c
+Config parse_args(int argc, char *argv[]);
+```
+parses all arguments and returns a Config struct.
+```c 
+pcap_if_t *get_network_interfaces();
+```
+returns a list of all possible interfaces
+```c
+void write_filter_exp(char *filter_exp, Config config);
+```
+Constructs a filter expression based on the configurations specified by the user.
+```c 
+void procces_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet);
+```
+Callback function used in pcap_loop when starting capturing packets
+```c
+void display_packet_contents(const unsigned char *data, int len)
+```
+displays content of packtets
+```c
+char *bytes_to_hex(uint8_t *bytes)
+char *convert_to_rfc3339(const struct pcap_pkthdr *packet_header)
+```
+theses 2 functions used to convert bytes to HEX representation and convert time to rfc3339 format
+
 ### Supported Protocols
 The sniffer supports a limited range of protocols:
 
@@ -104,9 +132,83 @@ Like its IPv4 counterpart, ICMPv6 (Internet Control Message Protocol version 6) 
 ## Testing
 For testing I have used [wireshark](https://www.wireshark.org/) in order to compare incoming packets and its content with IPK sniffer.
 
+## Input / Output examples 
+#### Input
+```
+./ipk-sniffer -i en0 --arp -n 2
+```
+#### Output 
+``` bash
+timestamp: 2024-04-20T10:57:34.474+02:00
+src MAC: cc:08:fa:a7:73:9c
+dst MAC: ff:ff:ff:ff:ff:ff
+frame length: 42 bytes
+src IP: 172.20.10.14
+dst IP: 172.20.10.1
+
+0x0000: ff ff ff ff ff ff cc 08 fa a7 73 9c 08 06 00 01  ..........s.....
+0x0010: 08 00 06 04 00 01 cc 08 fa a7 73 9c ac 14 0a 0e  ..........s.....
+0x0020: 00 00 00 00 00 00 ac 14 0a 01                    ..........
+
+
+timestamp: 2024-04-20T10:57:34.479+02:00
+src MAC: 1e:86:82:13:59:64
+dst MAC: cc:08:fa:a7:73:9c
+frame length: 42 bytes
+src IP: 172.20.10.1
+dst IP: 172.20.10.14
+
+0x0000: cc 08 fa a7 73 9c 1e 86 82 13 59 64 08 06 00 01  ....s.....Yd....
+0x0010: 08 00 06 04 00 02 1e 86 82 13 59 64 ac 14 0a 01  ..........Yd....
+0x0020: cc 08 fa a7 73 9c ac 14 0a 0e                    ....s.....
+```
+#### Input
+```
+./ipk-sniffer -i en0 --icmp6
+```
+#### Output 
+```bash
+timestamp: 2024-04-20T11:05:04.754+02:00
+src MAC: 4a:03:c7:56:e2:5d
+dst MAC: cc:08:fa:a7:73:9c
+frame length: 86 bytes
+src IP: fe80::c78:9081:47a5:69e1
+dst IP: fe80::c15:ad1e:df80:66c8
+
+0x0000: cc 08 fa a7 73 9c 4a 03 c7 56 e2 5d 86 dd 60 00  ....s.J..V.]..`.
+0x0010: 00 00 00 20 3a ff fe 80 00 00 00 00 00 00 0c 78  ... :..........x
+0x0020: 90 81 47 a5 69 e1 fe 80 00 00 00 00 00 00 0c 15  ..G.i...........
+0x0030: ad 1e df 80 66 c8 87 00 3a ef 00 00 00 00 fe 80  ....f...:.......
+0x0040: 00 00 00 00 00 00 0c 15 ad 1e df 80 66 c8 01 01  ............f...
+0x0050: 4a 03 c7 56 e2 5d                                J..V.]
+```
+
+#### Input 
+```
+./ipk-sniffer -i en0 --tcp --port-source 61165 --port-destination 443
+```
+#### Output
+```bash 
+timestamp: 2024-04-20T11:17:31.825+02:00
+src MAC: cc:08:fa:a7:73:9c
+dst MAC: e2:94:67:c1:4d:b4
+frame length: 109 bytes
+src IP: 192.168.137.48
+dst IP: 35.186.224.34
+src port: 61165
+dst port: 443
+
+0x0000: e2 94 67 c1 4d b4 cc 08 fa a7 73 9c 08 00 45 00  ..g.M.....s...E.
+0x0010: 00 5f 00 00 40 00 40 06 ec e3 c0 a8 89 30 23 ba  ._..@.@......0#.
+0x0020: e0 22 ee ed 01 bb e5 9e 82 6b 83 69 a7 aa 80 18  .".......k.i....
+0x0030: 08 00 d7 6c 00 00 01 01 08 0a 10 e3 d6 95 30 22  ...l..........0"
+0x0040: 3b 3b 17 03 03 00 26 d9 dc c6 b4 be 9b 41 bd 15  ;;....&......A..
+0x0050: b1 70 cc 81 7e e0 7f 3d 6b 30 31 23 05 99 d4 00  .p..~..=k01#....
+0x0060: 9b 60 ab 85 19 9a 67 3d 69 15 bd 3f 68           .`....g=i..?h
+```
 Additionally testing edge cases were used to see if sniffer works as expected.
 
 ## Bibliography
 [PCAP tutorial in C. How to create sniffer](https://www.tcpdump.org/pcap.html)
 [TCP/IP layers, IPv4 protocols. Header format](https://book.huihoo.com/iptables-tutorial/c171.htm)
-[IPv6 protocols and how they work](https://www.spiceworks.com/tech/networking/articles/what-is-ipv6/)
+[IPv6 protocols and how do they work](https://www.spiceworks.com/tech/networking/articles/what-is-ipv6/)
