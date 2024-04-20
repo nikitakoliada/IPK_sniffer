@@ -436,8 +436,6 @@ void procces_packet(u_char *args, const struct pcap_pkthdr *header, const u_char
     struct ether_header *eth_header = (struct ether_header *)packet; // packet header
 
     // Print the packet information
-    printf("\n\n");
-
     printf("timestamp: %s\n", convert_to_rfc3339(header));
     printf("src MAC: %s\n", bytes_to_hex(eth_header->ether_shost)); 
     printf("dst MAC: %s\n", bytes_to_hex(eth_header->ether_dhost)); 
