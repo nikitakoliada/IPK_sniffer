@@ -428,7 +428,7 @@ void display_packet_contents(const unsigned char *data, int len)
             printf("%c", isprint(char_val) ? char_val : '.');
         }
     }
-    printf("\n");
+    printf("\n\n");
 }
 
 void procces_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
